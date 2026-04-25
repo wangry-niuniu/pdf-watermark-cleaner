@@ -1,0 +1,790 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PDF 水印擦除台</title>
+    <style>
+      :root {
+        --bg: #efe8dd;
+        --paper: #fffdf8;
+        --ink: #1f2937;
+        --muted: #6b7280;
+        --line: #d8ccbb;
+        --accent: #155e75;
+        --accent-strong: #0f4c5c;
+        --warm: #fbf4e8;
+        --danger: #b42318;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: "PingFang SC", "Noto Sans SC", sans-serif;
+        color: var(--ink);
+        user-select: none;
+        background:
+          radial-gradient(circle at top right, rgba(21, 94, 117, 0.08), transparent 26%),
+          radial-gradient(circle at bottom left, rgba(249, 115, 22, 0.08), transparent 24%),
+          linear-gradient(180deg, #f6f1e8 0%, var(--bg) 100%);
+      }
+
+      .page {
+        width: min(1280px, calc(100% - 24px));
+        margin: 24px auto;
+        display: grid;
+        grid-template-columns: 360px minmax(0, 1fr);
+        gap: 20px;
+      }
+
+      .panel,
+      .canvas-card {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        box-shadow: 0 16px 40px rgba(31, 41, 55, 0.08);
+      }
+
+      .panel {
+        padding: 22px;
+        align-self: start;
+        position: sticky;
+        top: 24px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 30px;
+        line-height: 1.1;
+      }
+
+      .sub {
+        color: var(--muted);
+        line-height: 1.7;
+        margin-bottom: 18px;
+      }
+
+      .dropzone {
+        border: 2px dashed #b9ad99;
+        border-radius: 18px;
+        background: var(--warm);
+        padding: 20px;
+        text-align: center;
+        transition: 0.18s ease;
+        cursor: pointer;
+      }
+
+      .dropzone.dragover {
+        border-color: var(--accent);
+        background: #eef8fb;
+      }
+
+      .dropzone strong {
+        display: block;
+        font-size: 18px;
+        margin-bottom: 6px;
+      }
+
+      .dropzone span {
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      #fileInput { display: none; }
+
+      .section {
+        margin-top: 18px;
+        padding-top: 18px;
+        border-top: 1px solid #ece4d7;
+      }
+
+      .section h2 {
+        font-size: 15px;
+        margin: 0 0 10px;
+      }
+
+      .meta,
+      .small {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .navigator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .navigator input[type="number"],
+      .region-item input[type="text"] {
+        width: 90px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        background: white;
+        font-size: 14px;
+      }
+
+      .navigator button,
+      .panel button,
+      .region-item select {
+        border: 0;
+        border-radius: 12px;
+        padding: 10px 14px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+
+      .navigator button,
+      .secondary {
+        background: #eee5d6;
+        color: #5b4636;
+      }
+
+      .navigator button:hover,
+      .secondary:hover {
+        background: #e5dac7;
+      }
+
+      .primary {
+        background: var(--accent);
+        color: white;
+        font-weight: 700;
+      }
+
+      .primary:hover { background: var(--accent-strong); }
+
+      .btn-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+      }
+
+      .hint,
+      .status,
+      .error {
+        margin-top: 14px;
+        border-radius: 14px;
+        padding: 12px 14px;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .hint {
+        background: #f7f8fa;
+        color: var(--muted);
+      }
+
+      .status {
+        background: #eef8fb;
+        color: #0f4c5c;
+      }
+
+      .error {
+        background: #fff1f3;
+        color: var(--danger);
+      }
+
+      .region-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .region-item {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px;
+        background: #fff;
+      }
+
+      .region-item strong {
+        display: block;
+        margin-bottom: 8px;
+      }
+
+      .region-item select,
+      .region-item input[type="text"] {
+        width: 100%;
+        margin-top: 8px;
+        border: 1px solid var(--line);
+        background: white;
+      }
+
+      .region-item .inline-row {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .region-item .remove-btn {
+        margin-top: 8px;
+        width: 100%;
+      }
+
+      .canvas-card {
+        padding: 18px;
+        min-height: 720px;
+      }
+
+      .canvas-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 14px;
+      }
+
+      .canvas-title {
+        font-weight: 700;
+      }
+
+      .canvas-sub {
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .canvas-wrap {
+        overflow: auto;
+        border-radius: 18px;
+        background: #e8e2d7;
+        padding: 18px;
+        min-height: 620px;
+      }
+
+      .stage {
+        position: relative;
+        width: fit-content;
+        margin: 0 auto;
+      }
+
+      #previewImage {
+        display: block;
+        max-width: 100%;
+        border-radius: 8px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+        user-select: none;
+        -webkit-user-drag: none;
+      }
+
+      .selection-layer {
+        position: absolute;
+        inset: 0;
+        cursor: crosshair;
+      }
+
+      .rect {
+        position: absolute;
+        border: 2px solid rgba(239, 68, 68, 0.95);
+        background: rgba(239, 68, 68, 0.18);
+        border-radius: 8px;
+      }
+
+      .rect .tag {
+        position: absolute;
+        top: -28px;
+        left: 0;
+        background: rgba(239, 68, 68, 0.95);
+        color: white;
+        border-radius: 999px;
+        padding: 4px 8px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .empty {
+        display: grid;
+        place-items: center;
+        min-height: 620px;
+        color: var(--muted);
+        text-align: center;
+        padding: 24px;
+      }
+
+      .download-link {
+        display: inline-block;
+        margin-top: 10px;
+        color: var(--accent);
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      @media (max-width: 980px) {
+        .page {
+          grid-template-columns: 1fr;
+        }
+
+        .panel {
+          position: static;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <aside class="panel">
+        <h1>PDF 水印擦除台</h1>
+        <div class="sub">拖入 PDF 后可以切换到任意页预览，再在当前页框选要擦掉的区域。每个框都能单独设置作用范围。</div>
+
+        <div id="dropzone" class="dropzone">
+          <strong>拖动 PDF 到这里</strong>
+          <span>或者点这里选择文件</span>
+          <input id="fileInput" type="file" accept=".pdf,application/pdf">
+        </div>
+
+        <div class="section">
+          <h2>当前文件</h2>
+          <div id="fileMeta" class="meta">还没有上传文件。</div>
+        </div>
+
+        <div class="section">
+          <h2>预览页</h2>
+          <div class="navigator">
+            <button id="prevPageBtn" type="button">上一页</button>
+            <input id="pageNumberInput" type="number" min="1" value="1" disabled>
+            <button id="goPageBtn" type="button">跳转</button>
+            <button id="nextPageBtn" type="button">下一页</button>
+          </div>
+          <div id="pageStatus" class="small" style="margin-top: 8px;">上传后可切换页码。</div>
+        </div>
+
+        <div class="section">
+          <h2>操作</h2>
+          <div class="btn-row">
+            <button id="clearCurrentPageBtn" class="secondary" type="button">清空当前页框选</button>
+            <button id="clearAllBtn" class="secondary" type="button">清空全部框选</button>
+            <button id="processBtn" class="primary" type="button" disabled>开始处理</button>
+          </div>
+          <div class="hint">每个红框会记录它来自哪一页。你可以让它只处理这一页，也可以套用到全部页，或指定页码。</div>
+          <div id="message"></div>
+        </div>
+
+        <div class="section">
+          <h2>已选区域</h2>
+          <div id="regionList" class="region-list small">还没有框选区域。</div>
+        </div>
+      </aside>
+
+      <main class="canvas-card">
+        <div class="canvas-head">
+          <div>
+            <div id="canvasTitle" class="canvas-title">预览页</div>
+            <div class="canvas-sub">按住鼠标拖出擦除区域，红框就是会被盖白的位置。</div>
+          </div>
+        </div>
+        <div class="canvas-wrap">
+          <div id="emptyState" class="empty">上传 PDF 后，这里会显示当前页预览图。</div>
+          <div id="stage" class="stage" hidden>
+            <img id="previewImage" alt="PDF 预览">
+            <div id="selectionLayer" class="selection-layer"></div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      const state = {
+        sessionId: null,
+        pageCount: 0,
+        currentPage: 1,
+        regions: [],
+        pageMeta: {},
+        drawing: false,
+        startX: 0,
+        startY: 0,
+        activeRectEl: null,
+      };
+
+      const dropzone = document.getElementById("dropzone");
+      const fileInput = document.getElementById("fileInput");
+      const fileMeta = document.getElementById("fileMeta");
+      const pageNumberInput = document.getElementById("pageNumberInput");
+      const prevPageBtn = document.getElementById("prevPageBtn");
+      const nextPageBtn = document.getElementById("nextPageBtn");
+      const goPageBtn = document.getElementById("goPageBtn");
+      const pageStatus = document.getElementById("pageStatus");
+      const processBtn = document.getElementById("processBtn");
+      const clearCurrentPageBtn = document.getElementById("clearCurrentPageBtn");
+      const clearAllBtn = document.getElementById("clearAllBtn");
+      const regionList = document.getElementById("regionList");
+      const message = document.getElementById("message");
+      const emptyState = document.getElementById("emptyState");
+      const stage = document.getElementById("stage");
+      const previewImage = document.getElementById("previewImage");
+      const selectionLayer = document.getElementById("selectionLayer");
+      const canvasTitle = document.getElementById("canvasTitle");
+
+      function setMessage(text = "", kind = "status", extraHtml = "") {
+        if (!text && !extraHtml) {
+          message.innerHTML = "";
+          return;
+        }
+        message.innerHTML = `<div class="${kind}">${text}${extraHtml}</div>`;
+      }
+
+      function pageRegions(page) {
+        return state.regions.filter((region) => region.sourcePage === page);
+      }
+
+      function totalHasRegions() {
+        return state.regions.length > 0;
+      }
+
+      function updateButtons() {
+        const hasSession = !!state.sessionId;
+        pageNumberInput.disabled = !hasSession;
+        prevPageBtn.disabled = !hasSession || state.currentPage <= 1;
+        nextPageBtn.disabled = !hasSession || state.currentPage >= state.pageCount;
+        goPageBtn.disabled = !hasSession;
+        processBtn.disabled = !totalHasRegions();
+      }
+
+      function renderRects() {
+        selectionLayer.querySelectorAll(".rect").forEach((el) => el.remove());
+        const current = pageRegions(state.currentPage);
+        current.forEach((rect, index) => {
+          const el = document.createElement("div");
+          el.className = "rect";
+          el.style.left = `${rect.x}px`;
+          el.style.top = `${rect.y}px`;
+          el.style.width = `${rect.width}px`;
+          el.style.height = `${rect.height}px`;
+          const tag = document.createElement("div");
+          tag.className = "tag";
+          tag.textContent = `页${rect.sourcePage} 区域${index + 1}`;
+          el.appendChild(tag);
+          selectionLayer.appendChild(el);
+        });
+        updateButtons();
+      }
+
+      function renderRegionList() {
+        if (!state.regions.length) {
+          regionList.textContent = "还没有框选区域。";
+          return;
+        }
+
+        regionList.innerHTML = "";
+        state.regions.forEach((region) => {
+          const item = document.createElement("div");
+          item.className = "region-item";
+
+          const title = document.createElement("strong");
+          title.textContent = `来自第 ${region.sourcePage} 页`;
+          item.appendChild(title);
+
+          const small = document.createElement("div");
+          small.className = "small";
+          small.textContent = `位置：x ${Math.round(region.x)} / y ${Math.round(region.y)} / 宽 ${Math.round(region.width)} / 高 ${Math.round(region.height)}`;
+          item.appendChild(small);
+
+          const select = document.createElement("select");
+          select.innerHTML = `
+            <option value="all">套用到全部页面</option>
+            <option value="same_page">只处理这一页</option>
+            <option value="custom">只处理指定页码</option>
+          `;
+          select.value = region.targetMode;
+          select.addEventListener("change", () => {
+            region.targetMode = select.value;
+            renderRegionList();
+          });
+          item.appendChild(select);
+
+          if (region.targetMode === "custom") {
+            const input = document.createElement("input");
+            input.type = "text";
+            input.placeholder = "例如：1,3,8-15";
+            input.value = region.pageSpec;
+            input.addEventListener("input", () => {
+              region.pageSpec = input.value;
+            });
+            item.appendChild(input);
+          }
+
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "secondary remove-btn";
+          removeBtn.textContent = "删除这个区域";
+          removeBtn.addEventListener("click", () => {
+            state.regions = state.regions.filter((candidate) => candidate.id !== region.id);
+            renderRegionList();
+            renderRects();
+          });
+          item.appendChild(removeBtn);
+
+          regionList.appendChild(item);
+        });
+      }
+
+      function pointerPosition(event) {
+        const bounds = selectionLayer.getBoundingClientRect();
+        return {
+          x: event.clientX - bounds.left,
+          y: event.clientY - bounds.top,
+        };
+      }
+
+      function clampRect(rect) {
+        const width = previewImage.clientWidth;
+        const height = previewImage.clientHeight;
+        const x = Math.max(0, Math.min(rect.x, width));
+        const y = Math.max(0, Math.min(rect.y, height));
+        const w = Math.max(0, Math.min(rect.width, width - x));
+        const h = Math.max(0, Math.min(rect.height, height - y));
+        return { x, y, width: w, height: h };
+      }
+
+      function currentPageMeta() {
+        return state.pageMeta[state.currentPage];
+      }
+
+      async function loadPreview(page) {
+        if (!state.sessionId) return;
+        const response = await fetch(`/api/preview/${state.sessionId}?page=${page}`);
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || "预览加载失败");
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const pageWidth = Number(response.headers.get("X-Page-Width")) || 0;
+        const pageHeight = Number(response.headers.get("X-Page-Height")) || 0;
+        const previewWidth = Number(response.headers.get("X-Preview-Width")) || 0;
+        const previewHeight = Number(response.headers.get("X-Preview-Height")) || 0;
+        previewImage.onload = () => {
+          emptyState.hidden = true;
+          stage.hidden = false;
+          selectionLayer.style.width = `${previewImage.clientWidth}px`;
+          selectionLayer.style.height = `${previewImage.clientHeight}px`;
+
+          state.pageMeta[page] = {
+            previewWidth: previewWidth || previewImage.naturalWidth,
+            previewHeight: previewHeight || previewImage.naturalHeight,
+            pageWidth: pageWidth || previewImage.naturalWidth,
+            pageHeight: pageHeight || previewImage.naturalHeight,
+          };
+          renderRects();
+        };
+        previewImage.src = url;
+        canvasTitle.textContent = `第 ${page} 页预览`;
+        pageStatus.textContent = `当前第 ${page} 页，共 ${state.pageCount} 页。`;
+        pageNumberInput.value = page;
+      }
+
+      async function uploadFile(file) {
+        if (!file) return;
+        setMessage("正在上传并生成预览，请稍等。");
+        const formData = new FormData();
+        formData.append("pdf", file);
+
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "上传失败");
+
+        state.sessionId = data.session_id;
+        state.pageCount = data.page_count;
+        state.currentPage = 1;
+        state.regions = [];
+        state.pageMeta = {
+          1: {
+            previewWidth: data.preview_width,
+            previewHeight: data.preview_height,
+            pageWidth: data.preview_width,
+            pageHeight: data.preview_height,
+          },
+        };
+
+        fileMeta.textContent = `${data.original_name}，共 ${data.page_count} 页。现在可以切换任意页并框选。`;
+        await loadPreview(1);
+        renderRegionList();
+        setMessage("上传完成。先切到需要的页，再拖动鼠标框选水印区域。");
+      }
+
+      selectionLayer.addEventListener("pointerdown", (event) => {
+        if (!state.sessionId) return;
+        const pos = pointerPosition(event);
+        state.drawing = true;
+        state.startX = pos.x;
+        state.startY = pos.y;
+        const rectEl = document.createElement("div");
+        rectEl.className = "rect";
+        state.activeRectEl = rectEl;
+        selectionLayer.appendChild(rectEl);
+      });
+
+      window.addEventListener("pointermove", (event) => {
+        if (!state.drawing || !state.activeRectEl) return;
+        const pos = pointerPosition(event);
+        const x = Math.min(state.startX, pos.x);
+        const y = Math.min(state.startY, pos.y);
+        const width = Math.abs(pos.x - state.startX);
+        const height = Math.abs(pos.y - state.startY);
+        Object.assign(state.activeRectEl.style, {
+          left: `${x}px`,
+          top: `${y}px`,
+          width: `${width}px`,
+          height: `${height}px`,
+        });
+      });
+
+      window.addEventListener("pointerup", (event) => {
+        if (!state.drawing || !state.activeRectEl) return;
+        state.drawing = false;
+        const pos = pointerPosition(event);
+        const rect = clampRect({
+          x: Math.min(state.startX, pos.x),
+          y: Math.min(state.startY, pos.y),
+          width: Math.abs(pos.x - state.startX),
+          height: Math.abs(pos.y - state.startY),
+        });
+        state.activeRectEl.remove();
+        state.activeRectEl = null;
+        if (rect.width >= 8 && rect.height >= 8) {
+          const meta = currentPageMeta();
+          state.regions.push({
+            id: `${Date.now()}-${Math.random()}`,
+            sourcePage: state.currentPage,
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+            targetMode: "all",
+            pageSpec: "",
+            previewWidth: meta.previewWidth,
+            previewHeight: meta.previewHeight,
+            pageWidth: meta.pageWidth,
+            pageHeight: meta.pageHeight,
+          });
+          renderRects();
+          renderRegionList();
+        }
+      });
+
+      async function goToPage(page) {
+        if (!state.sessionId) return;
+        const target = Math.max(1, Math.min(Number(page) || 1, state.pageCount));
+        state.currentPage = target;
+        try {
+          await loadPreview(target);
+        } catch (error) {
+          setMessage(error.message, "error");
+        }
+      }
+
+      async function processPdf() {
+        if (!state.sessionId) {
+          setMessage("请先上传 PDF。", "error");
+          return;
+        }
+        if (!state.regions.length) {
+          setMessage("请至少框选一个区域。", "error");
+          return;
+        }
+
+        const payload = {
+          session_id: state.sessionId,
+          regions: state.regions.map((region) => ({
+            source_page: region.sourcePage - 1,
+            x: region.x,
+            y: region.y,
+            width: region.width,
+            height: region.height,
+            target_mode: region.targetMode,
+            page_spec: region.pageSpec,
+            preview_width: region.previewWidth,
+            preview_height: region.previewHeight,
+            page_width: region.pageWidth,
+            page_height: region.pageHeight,
+          })),
+        };
+
+        setMessage("正在处理 PDF，请稍等。");
+        const response = await fetch("/api/process", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "处理失败");
+
+        const extra = `<br><a class="download-link" href="${data.download_url}">下载处理后的 PDF：${data.filename}</a>`;
+        setMessage("处理完成。", "status", extra);
+      }
+
+      clearCurrentPageBtn.addEventListener("click", () => {
+        state.regions = state.regions.filter((region) => region.sourcePage !== state.currentPage);
+        renderRects();
+        renderRegionList();
+        setMessage(`已清空第 ${state.currentPage} 页的框选区域。`);
+      });
+
+      clearAllBtn.addEventListener("click", () => {
+        state.regions = [];
+        renderRects();
+        renderRegionList();
+        setMessage("已清空全部框选区域。");
+      });
+
+      prevPageBtn.addEventListener("click", () => goToPage(state.currentPage - 1));
+      nextPageBtn.addEventListener("click", () => goToPage(state.currentPage + 1));
+      goPageBtn.addEventListener("click", () => goToPage(pageNumberInput.value));
+      pageNumberInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") goToPage(pageNumberInput.value);
+      });
+
+      dropzone.addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", async (event) => {
+        try {
+          await uploadFile(event.target.files[0]);
+        } catch (error) {
+          setMessage(error.message, "error");
+        }
+      });
+
+      ["dragenter", "dragover"].forEach((type) => {
+        dropzone.addEventListener(type, (event) => {
+          event.preventDefault();
+          dropzone.classList.add("dragover");
+        });
+      });
+
+      ["dragleave", "drop"].forEach((type) => {
+        dropzone.addEventListener(type, (event) => {
+          event.preventDefault();
+          dropzone.classList.remove("dragover");
+        });
+      });
+
+      dropzone.addEventListener("drop", async (event) => {
+        try {
+          await uploadFile(event.dataTransfer.files[0]);
+        } catch (error) {
+          setMessage(error.message, "error");
+        }
+      });
+
+      processBtn.addEventListener("click", async () => {
+        try {
+          await processPdf();
+        } catch (error) {
+          setMessage(error.message, "error");
+        }
+      });
+
+      window.addEventListener("resize", () => {
+        if (!stage.hidden) {
+          selectionLayer.style.width = `${previewImage.clientWidth}px`;
+          selectionLayer.style.height = `${previewImage.clientHeight}px`;
+          renderRects();
+        }
+      });
+    </script>
+  </body>
+</html>
