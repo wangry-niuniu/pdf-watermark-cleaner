@@ -1,0 +1,5 @@
+.DS_Store
+uploads/
+outputs/
+previews/
+__pycache__/
