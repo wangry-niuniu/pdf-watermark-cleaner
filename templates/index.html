@@ -446,12 +446,14 @@
         selectionLayer.querySelectorAll(".rect").forEach((el) => el.remove());
         const current = pageRegions(state.currentPage);
         current.forEach((rect, index) => {
+          const scaleX = rect.displayWidth ? previewImage.clientWidth / rect.displayWidth : 1;
+          const scaleY = rect.displayHeight ? previewImage.clientHeight / rect.displayHeight : 1;
           const el = document.createElement("div");
           el.className = "rect";
-          el.style.left = `${rect.x}px`;
-          el.style.top = `${rect.y}px`;
-          el.style.width = `${rect.width}px`;
-          el.style.height = `${rect.height}px`;
+          el.style.left = `${rect.x * scaleX}px`;
+          el.style.top = `${rect.y * scaleY}px`;
+          el.style.width = `${rect.width * scaleX}px`;
+          el.style.height = `${rect.height * scaleY}px`;
           const tag = document.createElement("div");
           tag.className = "tag";
           tag.textContent = `页${rect.sourcePage} 区域${index + 1}`;
@@ -562,8 +564,8 @@
           selectionLayer.style.height = `${previewImage.clientHeight}px`;
 
           state.pageMeta[page] = {
-            previewWidth: previewWidth || previewImage.naturalWidth,
-            previewHeight: previewHeight || previewImage.naturalHeight,
+            previewWidth: previewWidth || previewImage.clientWidth,
+            previewHeight: previewHeight || previewImage.clientHeight,
             pageWidth: pageWidth || previewImage.naturalWidth,
             pageHeight: pageHeight || previewImage.naturalHeight,
           };
@@ -657,8 +659,10 @@
             height: rect.height,
             targetMode: "all",
             pageSpec: "",
-            previewWidth: meta.previewWidth,
-            previewHeight: meta.previewHeight,
+            displayWidth: previewImage.clientWidth,
+            displayHeight: previewImage.clientHeight,
+            previewWidth: previewImage.clientWidth,
+            previewHeight: previewImage.clientHeight,
             pageWidth: meta.pageWidth,
             pageHeight: meta.pageHeight,
           });
@@ -698,8 +702,8 @@
             height: region.height,
             target_mode: region.targetMode,
             page_spec: region.pageSpec,
-            preview_width: region.previewWidth,
-            preview_height: region.previewHeight,
+            preview_width: region.displayWidth || region.previewWidth,
+            preview_height: region.displayHeight || region.previewHeight,
             page_width: region.pageWidth,
             page_height: region.pageHeight,
           })),

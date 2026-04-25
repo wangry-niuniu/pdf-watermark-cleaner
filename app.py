@@ -22,6 +22,7 @@ for directory in (UPLOAD_DIR, OUTPUT_DIR, PREVIEW_DIR):
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024
+SELECTION_PADDING_POINTS = 2.5
 
 
 @app.after_request
@@ -261,13 +262,18 @@ def process():
             preview_height = float(region["preview_height"])
             page_width = float(region["page_width"])
             page_height = float(region["page_height"])
-            x0 = max(0.0, min(page_width, float(region["x"]) / preview_width * page_width))
-            y0 = max(0.0, min(page_height, float(region["y"]) / preview_height * page_height))
-            x1 = max(0.0, min(page_width, (float(region["x"]) + float(region["width"])) / preview_width * page_width))
-            y1 = max(0.0, min(page_height, (float(region["y"]) + float(region["height"])) / preview_height * page_height))
+            x0 = float(region["x"]) / preview_width * page_width
+            y0 = float(region["y"]) / preview_height * page_height
+            x1 = (float(region["x"]) + float(region["width"])) / preview_width * page_width
+            y1 = (float(region["y"]) + float(region["height"])) / preview_height * page_height
             target_mode = str(region["target_mode"])
         except (KeyError, TypeError, ValueError):
             return jsonify({"error": "擦除区域数据不正确，请重新框选。"}), 400
+
+        x0 = max(0.0, x0 - SELECTION_PADDING_POINTS)
+        y0 = max(0.0, y0 - SELECTION_PADDING_POINTS)
+        x1 = min(page_width, x1 + SELECTION_PADDING_POINTS)
+        y1 = min(page_height, y1 + SELECTION_PADDING_POINTS)
 
         if source_page < 0 or source_page >= page_count:
             return jsonify({"error": "区域来源页码无效。"}), 400
